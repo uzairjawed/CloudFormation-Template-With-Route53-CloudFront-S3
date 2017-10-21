@@ -1,0 +1,199 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "This template will create a frontend environment using S3, CloudFront and a new Hosted Zone with Route53", 
+    "Resources": {
+        "HostedZone": {
+            "Type": "AWS::Route53::HostedZone",
+            "Properties": {
+                "Name": {
+                    "Ref": "HostedZoneName"
+                }
+            },
+            "DependsOn": [
+                "CloudFront"
+            ]
+        },
+        "S3Bucket": {
+            "Type": "AWS::S3::Bucket",
+            "Properties": {
+                "BucketName": {
+                    "Ref": "HostedZoneName"
+                },
+                "AccessControl": "PublicRead",
+                "WebsiteConfiguration": {
+                    "IndexDocument": "index.html",
+                    "ErrorDocument": "error.html"
+                }
+            }
+        },
+        "ResourseSets": {
+            "Type": "AWS::Route53::RecordSetGroup",
+            "Properties": {
+                "HostedZoneId": {
+                    "Ref": "HostedZone"
+                },
+                "RecordSets": [
+                    {
+                        "Type": "A",
+                        "Name": {
+                            "Fn::Join": [
+                                "",
+                                [
+                                    "www.",
+                                    {
+                                        "Ref": "HostedZoneName"
+                                    }
+                                ]
+                            ]
+                        },
+                        "AliasTarget": {
+                            "HostedZoneId": "Z2FDTNDATAQYW2",
+                            "DNSName": {
+                                "Fn::GetAtt": [
+                                    "CloudFront",
+                                    "DomainName"
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        "Name": {
+                            "Ref": "HostedZoneName"
+                        },
+                        "Type": "A",
+                        "AliasTarget": {
+                            "HostedZoneId": "Z2FDTNDATAQYW2",
+                            "DNSName": {
+                                "Fn::GetAtt": [
+                                    "CloudFront",
+                                    "DomainName"
+                                ]
+                            }
+                        }
+                    }
+                ]
+            },
+            "DependsOn": [
+                "HostedZone"
+            ]
+        },
+        "CloudFront": {
+            "Type": "AWS::CloudFront::Distribution",
+            "Properties": {
+                "DistributionConfig": {
+                    "Origins": [
+                        {
+                            "DomainName": {
+                                "Fn::GetAtt": [
+                                    "S3Bucket",
+                                    "DomainName"
+                                ]
+                            },
+                            "Id": {
+                                "Fn::Join": [
+                                    "",
+                                    [
+                                        {
+                                            "Ref": "HostedZoneName"
+                                        },
+                                        "Origin"
+                                    ]
+                                ]
+                            },
+                            "S3OriginConfig": {
+                                "OriginAccessIdentity": ""
+                            }
+                        }
+                    ],
+                    "Enabled": "true",
+                    "Aliases": [
+                        {
+                        "Ref": "HostedZoneName"
+                        }            
+                    ],
+                    "DefaultCacheBehavior": {
+                        "AllowedMethods": [
+                            "DELETE",
+                            "GET",
+                            "HEAD",
+                            "OPTIONS",
+                            "PATCH",
+                            "POST",
+                            "PUT"
+                        ],
+                        "TargetOriginId": {
+                            "Fn::Join": [
+                                "",
+                                [
+                                    {
+                                        "Ref": "HostedZoneName"
+                                    },
+                                    "Origin"
+                                ]
+                            ]
+                        },
+                        "ViewerProtocolPolicy": "redirect-to-https",
+                        "ForwardedValues": {
+                            "QueryString": "false",
+                            "Cookies": {
+                                "Forward": "none"
+                            }
+                        }
+                    },
+                    "ViewerCertificate": {
+                        "CloudFrontDefaultCertificate": true
+                    }
+                }
+            },
+            "DependsOn": [
+                "S3Bucket"
+            ]
+        }
+    },
+    "Parameters": {
+        "HostedZoneName": {
+            "Description": "Domain for the website. This will also try to create the bucket with the same name",
+            "Type": "String",
+            "MinLength": "1",
+            "MaxLength": "255",
+            "AllowedPattern": "[-.a-zA-Z0-9]*",
+            "ConstraintDescription": "can contain only alphanumeric characters, dot and dashes."
+        }
+    },
+    "Outputs": {
+        "BucketURL": {
+            "Value": {
+                "Fn::Join": [
+                    "",
+                    [
+                        "http://",
+                        {
+                            "Fn::GetAtt": [
+                                "S3Bucket",
+                                "DomainName"
+                            ]
+                        }
+                    ]
+                ]
+            },
+            "Description": "S3 Bucket URL"
+        },
+        "CloudFrontDistributionURL": {
+            "Value": {
+                "Fn::Join": [
+                    "",
+                    [
+                        "https://",
+                        {
+                            "Fn::GetAtt": [
+                                "CloudFront",
+                                "DomainName"
+                            ]
+                        }
+                    ]
+                ]
+            },
+            "Description": "CloudFront Distribution URL"
+        }
+    }
+}
